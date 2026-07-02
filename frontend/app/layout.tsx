@@ -17,7 +17,7 @@ const lora = Lora({
   subsets: ["latin"],
 });
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://sigil-deals.vercel.app";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://sigil-alpha.vercel.app";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

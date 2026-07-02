@@ -9,7 +9,7 @@ breaks their word, the other breaks the seal — the terms are revealed on-chain
 GenLayer AI validator panel reads the agreement, hears both sides, and rules a split
 of the escrow.
 
-**Live:** [sigil-deals.vercel.app](https://sigil-deals.vercel.app)
+**Live:** [sigil-alpha.vercel.app](https://sigil-alpha.vercel.app)
 
 ---
 
