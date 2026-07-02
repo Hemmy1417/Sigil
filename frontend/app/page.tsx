@@ -4,6 +4,7 @@ import Link from "next/link";
 import { TEMPLATES } from "@/lib/config";
 import { useStats } from "@/lib/hooks/useStats";
 import { SealMark } from "@/components/Seal";
+import { Reveal, CountUp } from "@/components/Motion";
 
 const STEPS = [
   {
@@ -26,14 +27,25 @@ const STEPS = [
   },
 ];
 
+const HASH_STRIP = [
+  "sha256 · cfa70a106cfcf4f28246a66d15044d95…",
+  "sha256 · 0db81696fea526aae2dcfab98956f55a…",
+  "sha256 · the chain sees the seal, never the words",
+  "sha256 · 758eb30037b3c5bf1c24fd2dbe90fbb3…",
+  "sha256 · what two people seal stays between them",
+];
+
 export default function Landing() {
   const stats = useStats();
 
   return (
     <div>
       {/* ── Hero ── */}
-      <section style={{ maxWidth: 1120, margin: "0 auto", padding: "88px 24px 64px" }}>
-        <div style={{ maxWidth: 640 }}>
+      <section style={{ maxWidth: 1120, margin: "0 auto", padding: "88px 24px 48px", position: "relative" }}>
+        <div className="seal-float desktop-only" style={{ position: "absolute", right: 48, top: 72, opacity: 0.13, pointerEvents: "none" }} aria-hidden>
+          <SealMark size={300} />
+        </div>
+        <div className="hero-stagger" style={{ maxWidth: 640, position: "relative" }}>
           <div
             className="small-text"
             style={{ color: "var(--purple)", letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: 16 }}
@@ -55,6 +67,17 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ── Sealed fingerprints drifting past ── */}
+      <div className="hash-crawl" style={{ padding: "8px 0 24px" }} aria-hidden>
+        <div className="hash-crawl-inner mono" style={{ fontSize: 12, color: "var(--ink-faint)" }}>
+          {[...HASH_STRIP, ...HASH_STRIP].map((h, i) => (
+            <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+              <SealMark size={12} /> {h}
+            </span>
+          ))}
+        </div>
+      </div>
+
       {/* ── Live stats ── */}
       {stats && (
         <section style={{ borderTop: "1px solid var(--line-soft)", borderBottom: "1px solid var(--line-soft)", background: "var(--paper-warm)" }}>
@@ -70,7 +93,9 @@ export default function Landing() {
               { label: "Seals broken", value: stats.total_disputes },
             ].map(({ label, value }) => (
               <div key={label}>
-                <div style={{ fontSize: 28, fontWeight: 700, color: "var(--ink)" }}>{value}</div>
+                <div style={{ fontSize: 28, fontWeight: 700, color: "var(--ink)" }}>
+                  <CountUp value={value} />
+                </div>
                 <div className="caption">{label}</div>
               </div>
             ))}
@@ -80,16 +105,20 @@ export default function Landing() {
 
       {/* ── How it works ── */}
       <section style={{ maxWidth: 1120, margin: "0 auto", padding: "72px 24px" }}>
-        <h2 className="section-heading" style={{ marginBottom: 40 }}>How a sigil works</h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 20 }}>
-          {STEPS.map((s) => (
-            <div key={s.n} className="sheet" style={{ padding: 28 }}>
-              <div className="small-text" style={{ color: "var(--purple)", marginBottom: 12 }}>{s.n}</div>
-              <h3 className="feature-title" style={{ marginBottom: 10 }}>{s.title}</h3>
-              <p className="body-text" style={{ fontSize: 15 }}>{s.body}</p>
-            </div>
-          ))}
-        </div>
+        <Reveal>
+          <h2 className="section-heading" style={{ marginBottom: 40 }}>How a sigil works</h2>
+        </Reveal>
+        <Reveal stagger>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 20 }}>
+            {STEPS.map((s) => (
+              <div key={s.n} className="sheet" style={{ padding: 28 }}>
+                <div className="small-text" style={{ color: "var(--purple)", marginBottom: 12 }}>{s.n}</div>
+                <h3 className="feature-title" style={{ marginBottom: 10 }}>{s.title}</h3>
+                <p className="body-text" style={{ fontSize: 15 }}>{s.body}</p>
+              </div>
+            ))}
+          </div>
+        </Reveal>
       </section>
 
       {/* ── The privacy proof ── */}
@@ -101,7 +130,7 @@ export default function Landing() {
             gap: 48, alignItems: "center",
           }}
         >
-          <div>
+          <Reveal>
             <h2 className="section-heading" style={{ marginBottom: 16 }}>
               The chain sees the seal.<br />Never the words.
             </h2>
@@ -114,8 +143,8 @@ export default function Landing() {
               Terms are only revealed if a party disputes. In the happy path — most deals —
               the contract settles and the words are never seen by anyone but you two.
             </p>
-          </div>
-          <div className="sheet" style={{ padding: 24 }}>
+          </Reveal>
+          <Reveal><div className="sheet" style={{ padding: 24 }}>
             <div className="small-text" style={{ marginBottom: 12, textTransform: "uppercase", letterSpacing: "1px" }}>
               What the public registry shows
             </div>
@@ -132,16 +161,19 @@ export default function Landing() {
               <SealMark size={16} />
               Terms: sealed forever. Nobody ever saw them.
             </div>
-          </div>
+          </div></Reveal>
         </div>
       </section>
 
       {/* ── Templates ── */}
       <section style={{ maxWidth: 1120, margin: "0 auto", padding: "72px 24px" }}>
-        <h2 className="section-heading" style={{ marginBottom: 8 }}>Start from a template</h2>
-        <p className="body-text" style={{ marginBottom: 32 }}>
-          Five shapes cover most handshakes. Every template is just words — edit anything.
-        </p>
+        <Reveal>
+          <h2 className="section-heading" style={{ marginBottom: 8 }}>Start from a template</h2>
+          <p className="body-text" style={{ marginBottom: 32 }}>
+            Five shapes cover most handshakes. Every template is just words — edit anything.
+          </p>
+        </Reveal>
+        <Reveal stagger>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 14 }}>
           {Object.entries(TEMPLATES).filter(([k]) => k !== "custom").map(([key, t]) => (
             <Link
@@ -163,13 +195,15 @@ export default function Landing() {
             <div className="caption">{TEMPLATES.custom.blurb}</div>
           </Link>
         </div>
+        </Reveal>
       </section>
 
       {/* ── Closing CTA ── */}
       <section style={{ maxWidth: 1120, margin: "0 auto", padding: "24px 24px 72px", textAlign: "center" }}>
+        <Reveal>
         <div className="sheet" style={{ padding: "56px 24px", background: "var(--paper-warm)" }}>
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
-            <SealMark size={48} />
+            <span className="seal-pulse" style={{ display: "inline-flex" }}><SealMark size={48} /></span>
           </div>
           <h2 className="sub-heading" style={{ marginBottom: 12 }}>Shake hands. Press the seal.</h2>
           <p className="body-text" style={{ marginBottom: 28 }}>
@@ -177,6 +211,7 @@ export default function Landing() {
           </p>
           <Link href="/new" className="btn-primary">Seal a deal</Link>
         </div>
+        </Reveal>
       </section>
     </div>
   );

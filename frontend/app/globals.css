@@ -314,3 +314,107 @@ textarea.field.terms-input {
 @media (min-width: 640px) { .mobile-only { display: none !important; } }
 
 ::selection { background: var(--purple-subtle); }
+
+/* ── Motion system — the sealing ceremony ── */
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(22px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes drift {
+  0%, 100% { transform: translateY(0) rotate(-6deg); }
+  50%      { transform: translateY(-14px) rotate(-2deg); }
+}
+
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(113, 50, 245, 0.25); }
+  70%  { box-shadow: 0 0 0 16px rgba(113, 50, 245, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(113, 50, 245, 0); }
+}
+
+@keyframes dot-in {
+  from { transform: scale(0); }
+  to   { transform: scale(1); }
+}
+
+@keyframes hash-crawl {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* Hero entrance — staggered children */
+.hero-stagger > * {
+  opacity: 0;
+  animation: rise-in 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+.hero-stagger > *:nth-child(1) { animation-delay: 0.05s; }
+.hero-stagger > *:nth-child(2) { animation-delay: 0.15s; }
+.hero-stagger > *:nth-child(3) { animation-delay: 0.28s; }
+.hero-stagger > *:nth-child(4) { animation-delay: 0.42s; }
+
+/* Scroll reveal */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.7s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.reveal.shown { opacity: 1; transform: translateY(0); }
+.reveal-stagger > * { transition-delay: 0s; }
+.reveal-stagger > *:nth-child(2) { transition-delay: 0.12s; }
+.reveal-stagger > *:nth-child(3) { transition-delay: 0.24s; }
+.reveal-stagger > *:nth-child(4) { transition-delay: 0.36s; }
+.reveal-stagger > *:nth-child(5) { transition-delay: 0.48s; }
+
+/* Floating seal watermark */
+.seal-float { animation: drift 7s ease-in-out infinite; }
+
+/* Sheet hover physics */
+a.sheet {
+  transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.25s, border-color 0.25s;
+}
+a.sheet:hover {
+  transform: translateY(-3px);
+  box-shadow: rgba(16, 24, 40, 0.08) 0px 12px 32px;
+  border-color: var(--purple-subtle);
+}
+
+/* Button physics */
+.btn-primary, .btn-outline, .btn-subtle, .btn-quiet, .btn-danger {
+  transition: transform 0.15s cubic-bezier(0.2, 0.7, 0.2, 1), background 0.15s, box-shadow 0.2s, filter 0.15s;
+}
+.btn-primary:hover { transform: translateY(-1px); box-shadow: rgba(113, 50, 245, 0.28) 0px 8px 20px; }
+.btn-primary:active, .btn-outline:active, .btn-danger:active { transform: scale(0.97); }
+
+/* Pulsing seal — the closing CTA */
+.seal-pulse { border-radius: 50%; animation: pulse-ring 2.4s ease-out infinite; }
+
+/* Provenance dots pop in sequence */
+.prov-step.done .prov-dot { animation: dot-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.4) both; }
+.prov-step:nth-child(1) .prov-dot { animation-delay: 0.05s; }
+.prov-step:nth-child(2) .prov-dot { animation-delay: 0.15s; }
+.prov-step:nth-child(3) .prov-dot { animation-delay: 0.25s; }
+.prov-step:nth-child(4) .prov-dot { animation-delay: 0.35s; }
+.prov-step:nth-child(5) .prov-dot { animation-delay: 0.45s; }
+.prov-step:nth-child(6) .prov-dot { animation-delay: 0.55s; }
+
+/* Awaiting states breathe */
+.prov-step:not(.done) .prov-dot { animation: pulse-ring 2s ease-out infinite; }
+
+/* Hash crawl — sealed fingerprints drifting across the hero */
+.hash-crawl {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 15%, black 85%, transparent);
+  mask-image: linear-gradient(90deg, transparent, black 15%, black 85%, transparent);
+}
+.hash-crawl-inner {
+  display: inline-flex;
+  gap: 48px;
+  white-space: nowrap;
+  animation: hash-crawl 60s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-stagger > *, .reveal, .seal-float, .seal-pulse, .hash-crawl-inner,
+  .prov-step .prov-dot { animation: none !important; transition: none !important; opacity: 1 !important; transform: none !important; }
+}
