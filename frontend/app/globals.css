@@ -1,0 +1,316 @@
+@import "tailwindcss";
+
+/* ── SIGIL design system — Kraken-inspired light theme ──
+   White paper, near-black ink, Kraken purple wax. Documents, not dashboards. */
+
+:root {
+  /* brand */
+  --purple:        #7132f5;
+  --purple-dark:   #5741d8;
+  --purple-deep:   #5b1ecf;
+  --purple-subtle: rgba(133, 91, 251, 0.16);
+
+  /* surfaces */
+  --paper:         #ffffff;
+  --paper-warm:    #fafafc;
+  --paper-inset:   #f4f4f8;
+
+  /* ink */
+  --ink:           #101114;
+  --ink-soft:      #484b5e;
+  --ink-muted:     #686b82;
+  --ink-faint:     #9497a9;
+
+  /* hairlines */
+  --line:          #dedee5;
+  --line-soft:     #ebebf0;
+
+  /* semantic */
+  --green:         #149e61;
+  --green-dark:    #026b3f;
+  --green-bg:      rgba(20, 158, 97, 0.16);
+  --red:           #d02c2c;
+  --red-bg:        rgba(208, 44, 44, 0.10);
+  --amber:         #b07a10;
+  --amber-bg:      rgba(240, 180, 41, 0.16);
+
+  /* shadows — whisper level */
+  --shadow-card:   rgba(0, 0, 0, 0.03) 0px 4px 24px;
+  --shadow-micro:  rgba(16, 24, 40, 0.04) 0px 1px 4px;
+
+  /* radii — 12px buttons, never pills */
+  --r-btn:  12px;
+  --r-card: 16px;
+  --r-tag:  6px;
+}
+
+@theme inline {
+  --color-background: var(--paper);
+  --color-foreground: var(--ink);
+  --font-sans: var(--font-plex);
+  --font-serif: var(--font-lora);
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-plex), "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.38;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Typography ── */
+
+.hero-display {
+  font-size: clamp(34px, 5vw, 48px);
+  font-weight: 700;
+  line-height: 1.17;
+  letter-spacing: -1px;
+  color: var(--ink);
+}
+
+.section-heading {
+  font-size: clamp(28px, 4vw, 36px);
+  font-weight: 700;
+  line-height: 1.22;
+  letter-spacing: -0.5px;
+  color: var(--ink);
+}
+
+.sub-heading {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.29;
+  letter-spacing: -0.5px;
+  color: var(--ink);
+}
+
+.feature-title {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.body-text  { font-size: 16px; font-weight: 400; line-height: 1.38; color: var(--ink-soft); }
+.body-med   { font-size: 16px; font-weight: 500; line-height: 1.38; color: var(--ink); }
+.caption    { font-size: 14px; font-weight: 400; line-height: 1.43; color: var(--ink-muted); }
+.small-text { font-size: 12px; font-weight: 500; line-height: 1.33; color: var(--ink-faint); }
+
+/* Terms of an agreement render in serif — contracts deserve a serif. */
+.terms-text {
+  font-family: var(--font-lora), Georgia, serif;
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--ink);
+  white-space: pre-wrap;
+}
+
+.mono {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 13px;
+}
+
+/* ── Buttons — 12px radius, sentence case, no pills ── */
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--purple);
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 600;
+  padding: 13px 24px;
+  border: none;
+  border-radius: var(--r-btn);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-primary:hover  { background: var(--purple-dark); }
+.btn-primary:active { background: var(--purple-deep); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #ffffff;
+  color: var(--purple-dark);
+  font-size: 16px;
+  font-weight: 600;
+  padding: 12px 23px;
+  border: 1px solid var(--purple-dark);
+  border-radius: var(--r-btn);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-outline:hover { background: var(--purple-subtle); }
+.btn-outline:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-subtle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--purple-subtle);
+  color: var(--purple);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--r-btn);
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+.btn-subtle:hover { filter: brightness(0.96); }
+
+.btn-quiet {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(148, 151, 169, 0.08);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--r-btn);
+  cursor: pointer;
+}
+.btn-quiet:hover { background: rgba(148, 151, 169, 0.16); }
+
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #ffffff;
+  color: var(--red);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 18px;
+  border: 1px solid var(--red);
+  border-radius: var(--r-btn);
+  cursor: pointer;
+}
+.btn-danger:hover { background: var(--red-bg); }
+
+/* ── The document sheet — deals render as paper ── */
+
+.sheet {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+}
+
+.sheet-inset {
+  background: var(--paper-warm);
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+}
+
+/* ── Badges ── */
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--r-tag);
+  background: rgba(104, 107, 130, 0.12);
+  color: var(--ink-soft);
+}
+.tag-open     { background: var(--purple-subtle); color: var(--purple-deep); }
+.tag-active   { background: rgba(24, 95, 165, 0.12); color: #185fa5; }
+.tag-settled  { background: var(--green-bg); color: var(--green-dark); }
+.tag-disputed { background: var(--amber-bg); color: var(--amber); }
+.tag-resolved { background: var(--green-bg); color: var(--green-dark); }
+.tag-cancelled{ background: rgba(104, 107, 130, 0.12); color: var(--ink-muted); }
+
+/* ── Inputs ── */
+
+.field {
+  width: 100%;
+  background: #ffffff;
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.38;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.field:focus {
+  border-color: var(--purple);
+  box-shadow: 0 0 0 3px var(--purple-subtle);
+}
+.field::placeholder { color: var(--ink-faint); }
+
+textarea.field {
+  min-height: 140px;
+  resize: vertical;
+}
+
+textarea.field.terms-input {
+  font-family: var(--font-lora), Georgia, serif;
+  line-height: 1.7;
+  min-height: 220px;
+}
+
+/* ── Nav link ── */
+
+.nav-link {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.nav-link:hover { color: var(--ink); }
+.nav-link.active { color: var(--purple); }
+
+/* ── Provenance strip (chain of custody) ── */
+
+.prov-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+.prov-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--line);
+  flex: none;
+}
+.prov-step.done .prov-dot { background: var(--purple); }
+.prov-step.done { color: var(--ink); }
+
+/* ── Wax seal pulse (the sealing moment) ── */
+
+@keyframes seal-press {
+  0%   { transform: scale(1.6); opacity: 0; }
+  55%  { transform: scale(0.94); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.seal-press { animation: seal-press 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+
+/* ── Responsive helpers ── */
+
+.desktop-only { display: none !important; }
+@media (min-width: 640px) { .desktop-only { display: flex !important; } }
+.mobile-only { display: flex !important; }
+@media (min-width: 640px) { .mobile-only { display: none !important; } }
+
+::selection { background: var(--purple-subtle); }
