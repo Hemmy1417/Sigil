@@ -45,7 +45,7 @@ of the escrow.
 ```
 frontend (Next.js 16, Vercel) ──── genlayer-js ──── GenLayer Studionet
         │                                               sigil.py
-        └── api (Express, Fly.io) ── Firebase Firestore
+        └── /api/vault (Next.js route handlers) ── Firebase Firestore
             the sealed-terms vault: terms stored off-chain,
             readable only by the two parties (wallet-signature auth)
 ```
@@ -55,7 +55,7 @@ frontend (Next.js 16, Vercel) ──── genlayer-js ──── GenLayer Stu
 | Contract | GenLayer Intelligent Contract (Python) |
 | Frontend | Next.js 16, React 19, Tailwind v4 — Kraken-inspired light design |
 | Auth | Injected wallets only (EIP-6963: MetaMask, Rabby, …) |
-| Vault API | Express + Firebase Admin on Fly.io |
+| Vault | Next.js API routes + Firebase Admin (Firestore) |
 | Chain | GenLayer Studionet, GEN token |
 
 ## Contract
@@ -85,13 +85,14 @@ Sigil/
 ├── deploy/deployScript.ts    # scripted deployment
 ├── tests/direct/             # direct-mode contract tests (pytest)
 ├── gltest.config.yaml
-├── api/                      # sealed-terms vault (Express + Firestore)
 └── frontend/
     ├── app/                  # landing, deals, new, deal/[id], verify, registry, u/[address]
+    │   └── api/vault/        # the sealed-terms vault (route handlers + Firestore)
     ├── components/
     └── lib/
         ├── genlayer/         # client + wallet provider
         ├── contracts/        # typed contract wrapper + types
+        ├── server/           # Firebase Admin + signature auth (server-only)
         └── hooks/
 ```
 
@@ -102,25 +103,16 @@ Sigil/
 pip install -r requirements.txt
 pytest tests/direct/ -v
 
-# vault API
-cd api
-cp .env.Example .env          # Firebase Admin credentials
-npm install && npm run dev
-
-# frontend
+# frontend (includes the vault API routes)
 cd frontend
-cp .env.Example .env.local
+cp .env.Example .env.local    # contract address + Firebase Admin credentials
 npm install && npm run dev
 ```
 
 ## Environment variables
 
-**Frontend (`frontend/.env.local`):**
+**`frontend/.env.local` (also set these on Vercel):**
 - `NEXT_PUBLIC_CONTRACT_ADDRESS`
-- `NEXT_PUBLIC_API_URL`
-
-**API (`api/.env`):**
-- `FIREBASE_PROJECT_ID`
-- `FIREBASE_CLIENT_EMAIL`
-- `FIREBASE_PRIVATE_KEY`
-- `PORT`
+- `FIREBASE_PROJECT_ID` — vault (server-side only)
+- `FIREBASE_CLIENT_EMAIL` — vault (server-side only)
+- `FIREBASE_PRIVATE_KEY` — vault (server-side only)

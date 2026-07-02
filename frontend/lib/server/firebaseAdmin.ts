@@ -1,3 +1,6 @@
+// Server-only: Firebase Admin for the sealed-terms vault. Never import from
+// client components — route handlers only.
+
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
@@ -12,14 +15,15 @@ function privateKey(): string {
   return raw.includes("\\n") ? raw.replace(/\\n/g, "\n") : raw;
 }
 
-if (getApps().length === 0) {
-  initializeApp({
-    credential: cert({
-      projectId: requiredEnv("FIREBASE_PROJECT_ID"),
-      clientEmail: requiredEnv("FIREBASE_CLIENT_EMAIL"),
-      privateKey: privateKey(),
-    }),
-  });
+export function vaultDb() {
+  if (getApps().length === 0) {
+    initializeApp({
+      credential: cert({
+        projectId: requiredEnv("FIREBASE_PROJECT_ID"),
+        clientEmail: requiredEnv("FIREBASE_CLIENT_EMAIL"),
+        privateKey: privateKey(),
+      }),
+    });
+  }
+  return getFirestore();
 }
-
-export const db = getFirestore();

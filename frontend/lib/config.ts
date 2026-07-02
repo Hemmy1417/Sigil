@@ -9,7 +9,8 @@ export const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ||
   "0xc46614d4B85a6F4D81e4E3817A1F4171c327ADA3") as `0x${string}`;
 export const CONTRACT_CONFIGURED = /^0x[a-fA-F0-9]{40}$/.test(CONTRACT_ADDRESS);
 
-export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001").replace(/\/$/, "");
+// The vault lives in this app's own /api routes — same origin, empty base URL.
+export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
 
 export const TEMPLATES: Record<string, { name: string; blurb: string; body: string }> = {
   loan: {

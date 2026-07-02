@@ -44,18 +44,4 @@ jobs:
       - run: npx next build
         env:
           NEXT_PUBLIC_CONTRACT_ADDRESS: "0xc46614d4B85a6F4D81e4E3817A1F4171c327ADA3"
-          NEXT_PUBLIC_API_URL: "https://sigil-api.fly.dev"
 
-  typecheck-api:
-    name: API typecheck
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: api
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-      - run: npm ci
-      - run: npx tsc --noEmit

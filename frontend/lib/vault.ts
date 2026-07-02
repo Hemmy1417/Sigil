@@ -53,7 +53,7 @@ export async function storeTerms(
 ): Promise<string> {
   const hash = await termsHash(args.terms, args.salt);
   const headers = await signHeaders(provider, address, hash);
-  const res = await fetch(`${API_URL}/vault`, {
+  const res = await fetch(`${API_URL}/api/vault`, {
     method: "POST",
     headers: { "content-type": "application/json", ...headers },
     body: JSON.stringify(args),
@@ -69,7 +69,7 @@ export async function fetchTerms(
   hash: string,
 ): Promise<VaultDoc> {
   const headers = await signHeaders(provider, address, hash);
-  const res = await fetch(`${API_URL}/vault/${hash}`, { headers });
+  const res = await fetch(`${API_URL}/api/vault/${hash}`, { headers });
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || "Could not fetch the sealed terms");
   return json;
