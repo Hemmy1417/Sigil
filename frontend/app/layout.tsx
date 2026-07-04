@@ -4,6 +4,7 @@ import "./globals.css";
 import { WalletProvider } from "@/lib/genlayer/wallet";
 import Nav from "@/components/Nav";
 import { SealMark } from "@/components/Seal";
+import { LiveBackdrop } from "@/components/LiveBackdrop";
 
 const plex = IBM_Plex_Sans({
   weight: ["400", "500", "600", "700"],
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${plex.variable} ${lora.variable}`}>
       <body className="min-h-screen flex flex-col">
+        <LiveBackdrop />
         <WalletProvider>
           <Nav />
           <main style={{ flex: 1 }}>{children}</main>
