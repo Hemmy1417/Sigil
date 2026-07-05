@@ -60,7 +60,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <SealMark size={18} />
                 <span className="caption">Sigil — what two people seal stays between them.</span>
               </span>
-              <span className="caption">Arbitrated by GenLayer validators</span>
+              <span className="caption">Arbitrated by GenLayer validators · <a href={`https://explorer-studio.genlayer.com/address/${process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ?? ""}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "underline" }}>Verify on explorer ↗</a></span>
             </div>
           </footer>
         </WalletProvider>
