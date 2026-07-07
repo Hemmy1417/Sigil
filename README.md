@@ -60,9 +60,12 @@ frontend (Next.js 16, Vercel) ──── genlayer-js ──── GenLayer Stu
 
 ## Contract
 
-- **Address:** `0xc46614d4B85a6F4D81e4E3817A1F4171c327ADA3`
+- **Address:** `0x7559C51fA7D2cBCEE788586c55b49Ec31B4bdFFA`
+
+> **Payout fix (July 2026).** Wallet payouts are sent as EVM external messages (an empty `@gl.evm.contract_interface` proxy executed by the contract's ghost account). The previous GenVM-call pattern errored at finalization on plain wallets and stranded the value; the contract was redeployed at the address above with the corrected transfer path.
+
 - **Network:** GenLayer Studionet
-- **View in Studio:** [GenLayer Studio](https://studio.genlayer.com/?import-contract=0xc46614d4B85a6F4D81e4E3817A1F4171c327ADA3)
+- **View in Studio:** [GenLayer Studio](https://studio.genlayer.com/?import-contract=0x7559C51fA7D2cBCEE788586c55b49Ec31B4bdFFA)
 
 No wall-clock exists on Studionet's GenVM, so every lifecycle gate is action-based:
 unaccepted proposals are cancellable, deadlines live in the sealed terms (the arbiter
