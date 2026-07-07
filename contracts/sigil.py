@@ -44,6 +44,18 @@ def _nearest_bucket(pct):
     return min(SPLIT_BUCKETS, key=lambda b: abs(b - p))
 
 
+# Empty EVM interface: paying a wallet is an external message through the
+# chain layer (executed by the IC's ghost contract), NOT a GenVM call —
+# gl.get_contract_at(...).emit_transfer at an EOA errors at finalization
+# and the value is stranded. Proven empirically on Curia round 1.
+@gl.evm.contract_interface
+class _Payee:
+    class View:
+        pass
+    class Write:
+        pass
+
+
 class Sigil(gl.Contract):
     total_deals:    u256
     total_settled:  u256
@@ -92,7 +104,7 @@ class Sigil(gl.Contract):
 
     def _pay(self, address, amount):
         if amount > 0:
-            gl.get_contract_at(Address(address)).emit_transfer(value=u256(int(amount)), on="finalized")
+            _Payee(Address(address)).emit_transfer(value=u256(int(amount)), on="finalized")
 
     def _payout(self, deal, to_proposer):
         total = int(deal["proposer_stake"]) + int(deal["counter_stake"])
