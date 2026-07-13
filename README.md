@@ -28,17 +28,43 @@ of the escrow.
 
 - **Commit/reveal privacy** — the public registry shows fingerprints, parties, and
   states. Never terms, unless a seal was broken by dispute
-- **AI arbitration** — `gl.eq_principle.prompt_comparative` consensus; validators only
-  need to agree on the split bucket (0/25/50/75/100), which keeps rulings determinate
+- **AI arbitration on fetched evidence** — `gl.eq_principle.prompt_comparative` consensus;
+  the contract fetches each party's pinned evidence URLs and rules from the hash-committed
+  agreement + that retrieved evidence, not bare statements. Validators only agree on the
+  split bucket (0/25/50/75/100), which keeps rulings determinate
 - **AI terms pre-read** — before sealing, ask the same arbiter to flag ambiguity in a
   draft (clarity score + issues)
 - **Deal templates** — loan, gig, wager, deposit, or custom
 - **Reputation ledger** — the one deliberately-public thing: sealed / settled clean /
   disputes won / disputes lost / forfeits, per wallet
-- **Nudge → escalate** — a silent respondent can be demanded to answer on-chain, then
-  escalated past; silence is weighed against them and forfeits their record
+- **Nudge → escalate, with a real window** — a silent respondent is demanded to answer
+  on-chain; escalation past them is only possible after a genuine response window has
+  elapsed, so no one can nudge and escalate in the same breath. Silence is weighed against
+  them and forfeits their record
 - **Trustless verifier** — anyone holding terms + salt can prove they match an on-chain
   seal, entirely in the browser
+
+## Dispute integrity
+
+Two properties make an arbitrated split defensible rather than a coin toss on unauthenticated
+text — both enforced in `sigil.py`, both covered by the direct tests in `tests/direct/`.
+
+**Contract-verifiable evidence path.** `dispute` and `respond` each accept `evidence_urls`
+(up to three). At arbitration the *contract itself* fetches every pinned URL with
+`gl.nondet.web.render` and injects the retrieved pages into the arbiter's prompt as
+`FETCHED EVIDENCE`. The ruling is grounded in the hash-committed agreement and that fetched
+evidence; the parties' written statements are explicitly demoted to advocacy. When nothing
+verifiable resolves an ambiguous term, the arbiter defaults to a middle split — it never
+hands the escrow to one side on their word alone. Unreachable URLs are surfaced to the
+arbiter as "no evidence," not silently trusted.
+
+**A real response opportunity.** A disputant cannot break the seal and immediately trigger
+the no-answer path. `escalate` requires a prior `nudge` *and* that `RESPONSE_WINDOW` protocol
+actions have elapsed since it — nudge and escalate can never land in the same transaction.
+Because on-chain execution is serialized, a `respond` that arrives before escalation is mined
+resolves the dispute on its merits (with both parties' evidence), so a genuine answer always
+wins if it shows up. Studionet's GenVM exposes no wall clock, so the window is measured in
+protocol actions rather than seconds — the honest primitive for this environment.
 
 ## Architecture
 
@@ -60,12 +86,12 @@ frontend (Next.js 16, Vercel) ──── genlayer-js ──── GenLayer Stu
 
 ## Contract
 
-- **Address:** `0x7559C51fA7D2cBCEE788586c55b49Ec31B4bdFFA`
+- **Address:** `0xb89e664E44CB5E68988C9D6D928fdaeC43048042`
 
 > **Payout fix (July 2026).** Wallet payouts are sent as EVM external messages (an empty `@gl.evm.contract_interface` proxy executed by the contract's ghost account). The previous GenVM-call pattern errored at finalization on plain wallets and stranded the value; the contract was redeployed at the address above with the corrected transfer path.
 
 - **Network:** GenLayer Studionet
-- **View in Studio:** [GenLayer Studio](https://studio.genlayer.com/?import-contract=0x7559C51fA7D2cBCEE788586c55b49Ec31B4bdFFA)
+- **View in Studio:** [GenLayer Studio](https://studio.genlayer.com/?import-contract=0xb89e664E44CB5E68988C9D6D928fdaeC43048042)
 
 No wall-clock exists on Studionet's GenVM, so every lifecycle gate is action-based:
 unaccepted proposals are cancellable, deadlines live in the sealed terms (the arbiter
