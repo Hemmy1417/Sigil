@@ -47,7 +47,8 @@ of the escrow.
 ## Dispute integrity
 
 Two properties make an arbitrated split defensible rather than a coin toss on unauthenticated
-text — both enforced in `sigil.py`, both covered by the direct tests in `tests/direct/`.
+text — both enforced in `sigil.py`, both covered by the direct tests in `tests/direct/`, and
+both verified live on Studionet (see *Verified on-chain* below).
 
 **Contract-verifiable evidence path.** `dispute` and `respond` each accept `evidence_urls`
 (up to three). At arbitration the *contract itself* fetches every pinned URL with
@@ -65,6 +66,16 @@ Because on-chain execution is serialized, a `respond` that arrives before escala
 resolves the dispute on its merits (with both parties' evidence), so a genuine answer always
 wins if it shows up. Studionet's GenVM exposes no wall clock, so the window is measured in
 protocol actions rather than seconds — the honest primitive for this environment.
+
+**Verified on-chain.** Both were exercised end-to-end through MetaMask on the deployed contract:
+
+- *Evidence path* — a disputant claimed "never delivered" while the counterparty's pinned
+  receipt (fetched by the contract) showed on-time delivery. The arbiter ruled **100% to the
+  counterparty** — decided on the fetched evidence, against the party who only asserted.
+- *Response window* — immediately after a `nudge`, `escalate` reverted with *"response window
+  still open."* Once the window legitimately elapsed with no answer, `escalate` succeeded, ruled
+  **by escalation**, and recorded a **forfeit** against the silent party. It blocks the instant
+  no-answer path without stonewalling a genuine one.
 
 ## Architecture
 
