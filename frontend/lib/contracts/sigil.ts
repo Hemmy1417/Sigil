@@ -55,12 +55,21 @@ export async function confirmSettlement(client: Client, dealId: string, toPropos
   return writeAndWait<Deal>(client, "confirm_settlement", [dealId, String(toProposerPct)]);
 }
 
-export async function disputeDeal(client: Client, dealId: string, terms: string, salt: string, statement: string) {
-  return writeAndWait<Deal>(client, "dispute", [dealId, terms, salt, statement]);
+export async function disputeDeal(
+  client: Client, dealId: string, terms: string, salt: string,
+  statement: string, evidenceUrls: string[] = [],
+) {
+  // The contract fetches these pinned URLs at arbitration and weighs them
+  // above bare statements; it expects a JSON-string list (defaults to "[]").
+  return writeAndWait<Deal>(client, "dispute",
+    [dealId, terms, salt, statement, JSON.stringify(evidenceUrls)]);
 }
 
-export async function respondToDispute(client: Client, dealId: string, statement: string) {
-  return writeAndWait<Deal>(client, "respond", [dealId, statement]);
+export async function respondToDispute(
+  client: Client, dealId: string, statement: string, evidenceUrls: string[] = [],
+) {
+  return writeAndWait<Deal>(client, "respond",
+    [dealId, statement, JSON.stringify(evidenceUrls)]);
 }
 
 export async function nudgeDeal(client: Client, dealId: string) {

@@ -13,6 +13,25 @@ import { fetchTerms, termsHash } from "@/lib/vault";
 import { SealMark } from "@/components/Seal";
 import type { Deal, DealState } from "@/lib/contracts/types";
 
+function EvidenceLinks({ urls }: { urls?: string[] }) {
+  if (!urls || urls.length === 0) return null;
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div className="small-text" style={{ textTransform: "uppercase", letterSpacing: "1px", marginBottom: 6 }}>
+        Pinned evidence — fetched by the contract
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        {urls.map((u) => (
+          <a key={u} href={u} target="_blank" rel="noopener noreferrer"
+            className="mono" style={{ color: "var(--purple-dark)", fontSize: 12, wordBreak: "break-all" }}>
+            {u}
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const STATE_TAG: Record<DealState, string> = {
   OPEN: "tag-open", ACTIVE: "tag-active", SETTLED: "tag-settled",
   DISPUTED: "tag-disputed", RESOLVED: "tag-resolved", CANCELLED: "tag-cancelled",
@@ -39,9 +58,13 @@ export default function DealRoom() {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [statement, setStatement] = useState("");
+  const [evidence, setEvidence] = useState("");
   const [settlePct, setSettlePct] = useState("50");
   const [acceptStake, setAcceptStake] = useState("");
   const [showDispute, setShowDispute] = useState(false);
+
+  // Up to three pinned evidence URLs; the contract fetches these at arbitration.
+  const evidenceUrls = evidence.split("\n").map((u) => u.trim()).filter(Boolean).slice(0, 3);
 
   const me = address?.toLowerCase() ?? "";
   const iAmProposer = deal ? deal.proposer.toLowerCase() === me : false;
@@ -90,7 +113,7 @@ export default function DealRoom() {
       } else {
         await reload();
       }
-      setStatement(""); setShowDispute(false);
+      setStatement(""); setEvidence(""); setShowDispute(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : `${name} failed`);
     } finally {
@@ -216,11 +239,13 @@ export default function DealRoom() {
                   Claim — <span className="mono">{shortAddr(deal.disputant)}</span>{iAmDisputant ? " (you)" : ""}
                 </div>
                 <p className="body-text">{deal.dispute_statement}</p>
+                <EvidenceLinks urls={deal.dispute_evidence} />
               </div>
               {deal.response_statement && (
                 <div className="sheet-inset" style={{ padding: 16 }}>
                   <div className="caption" style={{ marginBottom: 6 }}>Answer</div>
                   <p className="body-text">{deal.response_statement}</p>
+                  <EvidenceLinks urls={deal.response_evidence} />
                 </div>
               )}
             </div>
@@ -346,8 +371,17 @@ export default function DealRoom() {
                       <textarea className="field" style={{ minHeight: 100 }} maxLength={1500}
                         placeholder="Your claim: what did they fail to do?"
                         value={statement} onChange={(e) => setStatement(e.target.value)} />
+                      <div>
+                        <label className="caption" style={{ display: "block", marginBottom: 6 }}>
+                          Evidence links (optional, up to 3 — one per line). The arbiter fetches these and
+                          weighs them above statements.
+                        </label>
+                        <textarea className="field" style={{ minHeight: 64 }}
+                          placeholder="https://…"
+                          value={evidence} onChange={(e) => setEvidence(e.target.value)} />
+                      </div>
                       <button className="btn-danger" disabled={!!busy || !statement.trim() || !terms}
-                        onClick={() => act("dispute", () => disputeDeal(client, deal.deal_id, terms, salt, statement))}>
+                        onClick={() => act("dispute", () => disputeDeal(client, deal.deal_id, terms, salt, statement, evidenceUrls))}>
                         {busy === "dispute" ? "Breaking the seal…" : "Reveal and dispute"}
                       </button>
                       <button className="btn-quiet" onClick={() => setShowDispute(false)}>Keep it sealed</button>
@@ -366,8 +400,17 @@ export default function DealRoom() {
                   <textarea className="field" style={{ minHeight: 100 }} maxLength={1500}
                     placeholder="Your answer to the claim"
                     value={statement} onChange={(e) => setStatement(e.target.value)} />
+                  <div>
+                    <label className="caption" style={{ display: "block", marginBottom: 6 }}>
+                      Evidence links (optional, up to 3 — one per line). The arbiter fetches these and
+                      weighs them above statements.
+                    </label>
+                    <textarea className="field" style={{ minHeight: 64 }}
+                      placeholder="https://…"
+                      value={evidence} onChange={(e) => setEvidence(e.target.value)} />
+                  </div>
                   <button className="btn-primary" disabled={!!busy || !statement.trim()}
-                    onClick={() => act("respond", () => respondToDispute(client, deal.deal_id, statement))}>
+                    onClick={() => act("respond", () => respondToDispute(client, deal.deal_id, statement, evidenceUrls))}>
                     {busy === "respond" ? "The arbiter is reading…" : "Answer and go to ruling"}
                   </button>
                 </div>

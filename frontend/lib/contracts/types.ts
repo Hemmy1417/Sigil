@@ -23,6 +23,8 @@ export type Deal = {
   disputant: string;
   dispute_statement: string;
   response_statement: string;
+  dispute_evidence: string[];
+  response_evidence: string[];
   revealed_terms: string;
   revealed_salt: string;
   nudged: boolean;
