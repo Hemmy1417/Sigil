@@ -68,6 +68,30 @@ export async function writeAndWait<T>(
 
   const lr = receipt?.consensus_data?.leader_receipt;
   const r = Array.isArray(lr) ? lr[0] : lr;
+
+  // A reverted write (gl.vm.UserError — e.g. "response window still open") comes
+  // back as execution_result ERROR with an EMPTY stderr; the message rides in a
+  // rollback "payload" field. Surface it, or the UI silently swallows every
+  // contract-level rejection and looks like it did nothing.
+  if (r?.execution_result === "ERROR") {
+    const stderr: string = r?.genvm_result?.stderr ?? "";
+    const payloads: string[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const walk = (o: any, d = 0) => {
+      if (!o || d > 8) return;
+      if (Array.isArray(o)) { o.forEach((x) => walk(x, d + 1)); return; }
+      if (typeof o === "object") {
+        if (typeof o.payload === "string" && o.payload && o.payload !== "exit_code 1") payloads.push(o.payload);
+        Object.values(o).forEach((v) => walk(v, d + 1));
+      }
+    };
+    walk(receipt);
+    const userErr = stderr.match(/UserError: (.+)/)?.[1];
+    const msg = userErr || payloads.sort((a, b) => b.length - a.length)[0] || "";
+    console.error("[Sigil] contract execution error:", { method, stderr, payloads });
+    throw new Error((msg || "Contract execution error — see console").slice(0, 240));
+  }
+
   const payload = r?.result?.payload?.readable ?? r?.result?.readable ?? null;
   if (typeof payload === "string") {
     try { return JSON.parse(JSON.parse(payload)) as T; } catch { /* caller re-reads */ }
