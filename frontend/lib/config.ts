@@ -6,7 +6,7 @@ export const CHAIN_RPC = studionet.rpcUrls.default.http[0];
 export const CHAIN_NAME = studionet.name;
 
 export const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ||
-  "0xc46614d4B85a6F4D81e4E3817A1F4171c327ADA3") as `0x${string}`;
+  "0xD29b1a8b2ED86fd82269F977AE9825E2fB016377") as `0x${string}`;
 export const CONTRACT_CONFIGURED = /^0x[a-fA-F0-9]{40}$/.test(CONTRACT_ADDRESS);
 
 // The vault lives in this app's own /api routes — same origin, empty base URL.

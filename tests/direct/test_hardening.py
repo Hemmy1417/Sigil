@@ -67,12 +67,25 @@ class _Evm:
 
 
 _WEB_CALLS = []
+# Test wall-clock (epoch seconds). Tests advance this to simulate REAL time
+# passing — which no on-chain party can do. Starts ~2025-10.
+_NOW = [1_760_000_000]
 
 
 class _NondetWeb:
     @staticmethod
     def render(url, mode="text"):
         _WEB_CALLS.append(url)
+        # Serve the contract's pinned time sources from the test clock.
+        if "timeapi.io" in url:
+            import datetime as _dt
+            t = _dt.datetime.fromtimestamp(_NOW[0], _dt.timezone.utc)
+            return json.dumps({"year": t.year, "month": t.month, "day": t.day,
+                               "hour": t.hour, "minute": t.minute, "seconds": t.second})
+        if "cdn-cgi/trace" in url:
+            return f"fl=1x2\nh=cloudflare.com\nts={_NOW[0]}.000\nvisit_scheme=https\n"
+        if "worldtimeapi" in url:
+            return json.dumps({"unixtime": _NOW[0]})
         if "unreachable" in url:
             raise RuntimeError("403")
         return f"[fetched proof from {url}]"
@@ -144,6 +157,7 @@ def module():
 def c(module):
     _GL._emit = []
     _WEB_CALLS.clear()
+    _NOW[0] = 1_760_000_000            # reset the test wall-clock each test
     _EqPrinciple.canned = '{"split_to_disputant": 75, "rationale": "stub"}'
     _as(module, P, 0)
     s = module.Sigil()
@@ -219,20 +233,48 @@ def test_cannot_nudge_and_escalate_in_the_same_breath(module, c):
         c.escalate(did)
 
 
-def test_escalate_allowed_after_window_elapses(module, c):
+def test_escalate_allowed_after_real_time_elapses(module, c):
     did = _active_deal(module, c)
     _as(module, P, 0)
     c.dispute(did, TERMS, SALT, "Answer me.", "[]")
     _as(module, P, 0)
     c.nudge(did)
-    # advance the protocol action counter by RESPONSE_WINDOW via unrelated writes
-    for _ in range(module.RESPONSE_WINDOW):
-        _as(module, P, GEN)
-        c.create_deal(_hash("x", "y"), Q, "0", "custom", "filler")
+    # only REAL wall-clock time opens the gate — advance the clock past the window
+    _NOW[0] += module.RESPONSE_WINDOW_SECONDS + 1
     _as(module, P, 0)
     out = json.loads(c.escalate(did))
     assert out["state"] == "RESOLVED"
     assert out["ruling"]["kind"] == "escalation"
+
+
+def test_filler_deals_do_NOT_advance_the_window(module, c):
+    """The exact exploit the judges flagged: the disputant tries to run out the
+    window by creating unrelated deals. With a wall-clock gate, action count is
+    irrelevant — escalation stays refused until real time passes."""
+    did = _active_deal(module, c)
+    _as(module, P, 0)
+    c.dispute(did, TERMS, SALT, "Answer me.", "[]")
+    _as(module, P, 0)
+    c.nudge(did)
+    # spam many filler deals (advancing the global action counter) WITHOUT
+    # advancing the real clock
+    for _ in range(10):
+        _as(module, P, GEN)
+        c.create_deal(_hash("filler", str(_)), Q, "0", "custom", "filler")
+    _as(module, P, 0)
+    with pytest.raises(module.gl.vm.UserError, match="response window still open"):
+        c.escalate(did)
+
+
+def test_escalation_fails_closed_when_clock_is_unavailable(module, c):
+    did = _active_deal(module, c)
+    _as(module, P, 0)
+    c.dispute(did, TERMS, SALT, "Answer me.", "[]")
+    # time sources return an unusable clock → nudge itself is refused
+    _NOW[0] = 0
+    _as(module, P, 0)
+    with pytest.raises(module.gl.vm.UserError, match="unreachable or unreliable"):
+        c.nudge(did)
 
 
 def test_respond_during_window_beats_escalation(module, c):

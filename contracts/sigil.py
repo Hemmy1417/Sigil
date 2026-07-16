@@ -1,4 +1,4 @@
-# v0.2.0
+# v0.3.0
 # { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 import json
@@ -10,12 +10,13 @@ from genlayer import *
 # (reveals terms + salt on-chain), the counterparty answers, and an AI validator
 # panel rules a split of the pot.
 #
-# Studionet's GenVM exposes no time source (gl.message has no datetime, no block
-# number), so every lifecycle gate is action-based, never clock-based:
-#   - unaccepted proposals are cancellable by the proposer at any moment
-#   - deadlines belong in the sealed terms; the arbiter enforces them on reveal
-#   - a silent respondent is handled by nudge -> escalate (a respond that lands
-#     first always wins, because transactions serialize)
+# Studionet's GenVM exposes no native clock (gl.message has no datetime or block
+# number). Rather than fake one with a protocol-action counter — which a disputant
+# can advance themselves by creating unrelated deals — Sigil enforces the dispute
+# response window against REAL wall-clock time, fetched by the contract from
+# independent public time sources. No party can make real minutes elapse, so the
+# window cannot be shortcut. Other lifecycle gates stay action-based where there is
+# no adversarial timing pressure (cancel; reveal-deadline-in-terms).
 
 
 SPLIT_BUCKETS   = (0, 25, 50, 75, 100)   # % of pot to the DISPUTANT — arbiter picks one
@@ -26,12 +27,36 @@ MAX_EVIDENCE    = 3                       # pinned evidence URLs per side
 TEMPLATES       = ("loan", "gig", "wager", "deposit", "custom")
 NO_ANSWER       = "(the accused party gave no answer)"
 
-# Response window (no wall-clock on GenVM): escalation to the no-answer path is
-# gated on a minimum number of PROTOCOL ACTIONS elapsing after the nudge. Each
-# action is a separate on-chain transaction — genuine chain time during which a
-# respond() (which auto-arbitrates and beats escalation) can land. This is what
-# stops a disputant from nudging and escalating in the same breath.
-RESPONSE_WINDOW = 2
+# Response window: escalation to the no-answer path is gated on REAL elapsed time
+# since the nudge — NOT on protocol actions, which the disputant produces at will.
+# nudge() stamps the deal with wall-clock time fetched from independent time
+# sources; escalate() refuses until RESPONSE_WINDOW_SECONDS of real time have
+# passed, giving the respondent a genuine, un-shortcuttable window (a respond()
+# that lands first auto-arbitrates and beats escalation). Fetch failure fails
+# CLOSED: with no trusted clock, escalation is refused — never the respondent.
+RESPONSE_WINDOW_SECONDS = 600   # 10 real minutes (a constant; production would use days)
+# Independent, keyless UTC clocks. One reachable source suffices; the contract
+# fails closed only if every one is unreachable, so no single outage blocks a
+# dispute. Ordered by observed reliability.
+TIME_SOURCES = (
+    ("https://timeapi.io/api/time/current/zone?timeZone=UTC", "civil"),
+    ("https://www.cloudflare.com/cdn-cgi/trace",              "cf_trace"),
+    ("https://worldtimeapi.org/api/timezone/Etc/UTC",         "unixtime"),
+)
+# Any epoch below this (~2023-11) is treated as an unreliable/failed clock read.
+MIN_SANE_EPOCH = 1_700_000_000
+
+
+def _epoch_from_civil(y: int, m: int, d: int, hh: int, mm: int, ss: int) -> int:
+    """UTC civil date/time -> Unix epoch seconds (Howard Hinnant's days_from_civil).
+    Deterministic integer math — no library, no locale, no DST (UTC only)."""
+    yy = y - (1 if m <= 2 else 0)
+    era = (yy if yy >= 0 else yy - 399) // 400
+    yoe = yy - era * 400
+    doy = (153 * (m + (-3 if m > 2 else 9)) + 2) // 5 + d - 1
+    doe = yoe * 365 + yoe // 4 - yoe // 100 + doy
+    days = era * 146097 + doe - 719468
+    return days * 86400 + hh * 3600 + mm * 60 + ss
 
 EVIDENCE_GUARDRAILS = (
     "GUARDRAILS:\n"
@@ -111,6 +136,49 @@ class Sigil(gl.Contract):
     def _tick(self) -> int:
         self.action_counter = u256(int(self.action_counter) + 1)
         return int(self.action_counter)
+
+    def _utc_now(self) -> int:
+        """Current UTC epoch seconds, fetched from independent public time sources
+        under validator consensus. This is the response window's clock — real time
+        no party can advance. One reachable source suffices; two that disagree by
+        more than 5 minutes are treated as unreliable. Returns a trusted epoch or
+        raises (fail closed: escalation is refused when the clock can't be trusted).
+        """
+        def read_clock():
+            cands = []
+            for url, kind in TIME_SOURCES:
+                try:
+                    raw = gl.nondet.web.render(url, mode="text")
+                    if kind == "cf_trace":
+                        e = 0
+                        for line in raw.splitlines():
+                            if line.startswith("ts="):
+                                e = int(float(line[3:]))
+                                break
+                    elif kind == "unixtime":
+                        e = int(json.loads(raw)["unixtime"])
+                    else:  # civil
+                        d = json.loads(raw)
+                        e = _epoch_from_civil(int(d["year"]), int(d["month"]), int(d["day"]),
+                                              int(d["hour"]), int(d["minute"]), int(d["seconds"]))
+                    if e > MIN_SANE_EPOCH:
+                        cands.append(e)
+                except Exception:
+                    pass
+            if len(cands) >= 2 and (max(cands) - min(cands)) > 300:
+                return "0"                      # sources diverge → distrust the clock
+            return str(min(cands)) if cands else "0"
+
+        principle = (
+            "Outputs are equivalent if both are integer UTC epoch seconds within 300 "
+            "of each other (the value 0 means no reliable time was obtained)."
+        )
+        got = int(str(gl.eq_principle.prompt_comparative(read_clock, principle)).strip() or "0")
+        if got <= MIN_SANE_EPOCH:
+            raise gl.vm.UserError(
+                "time sources unreachable or unreliable — the response window cannot be "
+                "enforced against a trusted clock right now; try again shortly")
+        return got
 
     # ── internal helpers ─────────────────────────────────────────────────────
 
@@ -422,9 +490,10 @@ Respond ONLY with JSON:
 
     @gl.public.write
     def nudge(self, deal_id: str) -> str:
-        """On-chain demand to answer. Opens the response window — escalation is
-        only possible after RESPONSE_WINDOW protocol actions have since elapsed,
-        so the respondent gets a genuine on-chain opportunity to answer first."""
+        """On-chain demand to answer. Opens the response window by stamping the
+        deal with the current REAL wall-clock time (fetched under consensus).
+        Escalation is refused until RESPONSE_WINDOW_SECONDS of real time have
+        elapsed — a window no party, including the disputant, can accelerate."""
         deal   = self._deal(deal_id)
         sender = str(gl.message.sender_address)
         if deal["state"] != "DISPUTED":
@@ -433,18 +502,23 @@ Respond ONLY with JSON:
             raise gl.vm.UserError("only the disputant may nudge")
         if deal["nudged"]:
             raise gl.vm.UserError("already nudged — wait out the response window, then escalate")
-        deal["nudged"]    = True
-        deal["nudged_at"] = self._tick()   # window measured from here
+        now = self._utc_now()                          # fails closed if no trusted clock
+        deal["nudged"]           = True
+        deal["nudged_at"]        = self._tick()        # kept for the action log
+        deal["nudged_at_epoch"]  = now
+        deal["respond_by_epoch"] = now + RESPONSE_WINDOW_SECONDS
         self._log(deal, "nudged")
         self._save(deal)
         return json.dumps(deal)
 
     @gl.public.write
     def escalate(self, deal_id: str) -> str:
-        """Arbitration without an answer. Requires a prior nudge AND a real
-        response window (RESPONSE_WINDOW protocol actions) to have elapsed since
-        it — the disputant cannot nudge and escalate in the same breath. The
-        silence is weighed against the absent party and counts as a forfeit."""
+        """Arbitration without an answer. Requires a prior nudge AND that
+        RESPONSE_WINDOW_SECONDS of REAL wall-clock time have elapsed since it —
+        checked against a freshly fetched trusted clock, so the disputant cannot
+        nudge and escalate in the same breath, nor advance the window by creating
+        unrelated deals. The silence is weighed against the absent party as a
+        forfeit. (A respond() that lands during the window resolves it first.)"""
         deal   = self._deal(deal_id)
         sender = str(gl.message.sender_address)
         if deal["state"] != "DISPUTED":
@@ -453,11 +527,12 @@ Respond ONLY with JSON:
             raise gl.vm.UserError("only the disputant may escalate")
         if not deal["nudged"]:
             raise gl.vm.UserError("nudge first — give them the chance to answer")
-        elapsed = int(self.action_counter) - int(deal.get("nudged_at", 0))
-        if elapsed < RESPONSE_WINDOW:
+        now        = self._utc_now()                   # fails closed if no trusted clock
+        respond_by = int(deal.get("respond_by_epoch", 0))
+        if now < respond_by:
             raise gl.vm.UserError(
-                f"response window still open — {RESPONSE_WINDOW - elapsed} more protocol "
-                f"action(s) must elapse after the nudge before you can escalate"
+                f"response window still open — {respond_by - now}s of real time must still "
+                f"elapse before escalation (wall-clock; creating deals will not advance it)"
             )
 
         disputant_is_proposer = deal["disputant"].lower() == deal["proposer"].lower()

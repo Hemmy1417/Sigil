@@ -37,10 +37,11 @@ of the escrow.
 - **Deal templates** — loan, gig, wager, deposit, or custom
 - **Reputation ledger** — the one deliberately-public thing: sealed / settled clean /
   disputes won / disputes lost / forfeits, per wallet
-- **Nudge → escalate, with a real window** — a silent respondent is demanded to answer
-  on-chain; escalation past them is only possible after a genuine response window has
-  elapsed, so no one can nudge and escalate in the same breath. Silence is weighed against
-  them and forfeits their record
+- **Nudge → escalate, with a real wall-clock window** — a silent respondent is demanded to
+  answer on-chain; escalation past them is refused until a genuine response window of **real
+  elapsed time** has passed since the nudge — time the contract fetches from independent public
+  clocks, so no party can shortcut it by spamming unrelated transactions. Silence is weighed
+  against the absent party and forfeits their record
 - **Trustless verifier** — anyone holding terms + salt can prove they match an on-chain
   seal, entirely in the browser
 
@@ -59,23 +60,30 @@ verifiable resolves an ambiguous term, the arbiter defaults to a middle split �
 hands the escrow to one side on their word alone. Unreachable URLs are surfaced to the
 arbiter as "no evidence," not silently trusted.
 
-**A real response opportunity.** A disputant cannot break the seal and immediately trigger
-the no-answer path. `escalate` requires a prior `nudge` *and* that `RESPONSE_WINDOW` protocol
-actions have elapsed since it — nudge and escalate can never land in the same transaction.
-Because on-chain execution is serialized, a `respond` that arrives before escalation is mined
-resolves the dispute on its merits (with both parties' evidence), so a genuine answer always
-wins if it shows up. Studionet's GenVM exposes no wall clock, so the window is measured in
-protocol actions rather than seconds — the honest primitive for this environment.
+**A real response opportunity, enforced against a real clock.** A disputant cannot break the
+seal and immediately trigger the no-answer path. `escalate` requires a prior `nudge` *and*
+that `RESPONSE_WINDOW_SECONDS` of **real wall-clock time** have elapsed since it. Studionet's
+GenVM exposes no native clock, so the contract fetches the current time from independent public
+sources (timeapi.io, Cloudflare, worldtimeapi) under validator consensus and refuses escalation
+until the window has genuinely passed. This closes the gap a protocol-action counter left open:
+the disputant produces protocol actions at will — even unrelated filler deals advance a global
+counter — so only *real elapsed time*, which no party can manufacture with any number of wallets,
+is a window that cannot be shortcut. The clock **fails closed**: if no time source is reachable,
+escalation is refused, never granted. And because execution is serialized, a `respond` that lands
+before escalation resolves the dispute on its merits, so a genuine answer always wins if it shows up.
 
 **Verified on-chain.** Both were exercised end-to-end through MetaMask on the deployed contract:
 
 - *Evidence path* — a disputant claimed "never delivered" while the counterparty's pinned
   receipt (fetched by the contract) showed on-time delivery. The arbiter ruled **100% to the
   counterparty** — decided on the fetched evidence, against the party who only asserted.
-- *Response window* — immediately after a `nudge`, `escalate` reverted with *"response window
-  still open."* Once the window legitimately elapsed with no answer, `escalate` succeeded, ruled
-  **by escalation**, and recorded a **forfeit** against the silent party. It blocks the instant
-  no-answer path without stonewalling a genuine one.
+- *Response window (real-clock, v0.3)* — the direct tests in `tests/direct/test_hardening.py`
+  pin the new enforcement: `escalate` is refused immediately after a `nudge`; it succeeds only
+  once the fetched wall-clock has advanced past the window; **creating unrelated filler deals does
+  NOT advance it** (the exact exploit the earlier action-counter allowed); and the whole path fails
+  closed when no time source is reachable. The evidence-path verification above is unchanged; the
+  end-to-end MetaMask re-run of the real-clock window on the redeployed contract is the one
+  remaining live check.
 
 ## Architecture
 
@@ -97,17 +105,19 @@ frontend (Next.js 16, Vercel) ──── genlayer-js ──── GenLayer Stu
 
 ## Contract
 
-- **Address:** `0xb89e664E44CB5E68988C9D6D928fdaeC43048042`
+- **Address:** `0xD29b1a8b2ED86fd82269F977AE9825E2fB016377`
 
 > **Payout fix (July 2026).** Wallet payouts are sent as EVM external messages (an empty `@gl.evm.contract_interface` proxy executed by the contract's ghost account). The previous GenVM-call pattern errored at finalization on plain wallets and stranded the value; the contract was redeployed at the address above with the corrected transfer path.
 
 - **Network:** GenLayer Studionet
-- **View in Studio:** [GenLayer Studio](https://studio.genlayer.com/?import-contract=0xb89e664E44CB5E68988C9D6D928fdaeC43048042)
+- **View in Studio:** [GenLayer Studio](https://studio.genlayer.com/?import-contract=0xD29b1a8b2ED86fd82269F977AE9825E2fB016377)
 
-No wall-clock exists on Studionet's GenVM, so every lifecycle gate is action-based:
-unaccepted proposals are cancellable, deadlines live in the sealed terms (the arbiter
-enforces them on reveal), and dispute liveness uses nudge → escalate, where a response
-that lands first always wins.
+Studionet's GenVM exposes no native clock, so most lifecycle gates are action-based:
+unaccepted proposals are cancellable, and deadlines live in the sealed terms (the arbiter
+enforces them on reveal). The one gate under adversarial timing pressure — the dispute
+response window — is instead enforced against **real wall-clock time fetched from independent
+public clocks**, because only real time is a window the disputant cannot advance themselves.
+A `respond` that lands before escalation still always wins.
 
 ## The vault
 
