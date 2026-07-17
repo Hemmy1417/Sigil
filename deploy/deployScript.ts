@@ -40,9 +40,12 @@ export default async function main(client: GenLayerClient<GenLayerChain>) {
     const deployedContractAddress =
       (client.chain as GenLayerChain).id === localnet.id
         ? receipt.data?.contract_address
-        : (receipt.txDataDecoded as DecodedDeployData)?.contractAddress;
+        : (receipt.txDataDecoded as DecodedDeployData)?.contractAddress
+          ?? (receipt as any)?.data?.contract_address
+          ?? (receipt as any)?.contractAddress;
 
     console.log(`Sigil deployed at address: ${deployedContractAddress}`);
+    console.log("DEPLOY_TX:", deployTransaction);
     console.log(
       "Set NEXT_PUBLIC_CONTRACT_ADDRESS in frontend/.env.local to this address.",
     );

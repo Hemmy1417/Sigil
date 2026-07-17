@@ -63,14 +63,27 @@ arbiter as "no evidence," not silently trusted.
 **A real response opportunity, enforced against a real clock.** A disputant cannot break the
 seal and immediately trigger the no-answer path. `escalate` requires a prior `nudge` *and*
 that `RESPONSE_WINDOW_SECONDS` of **real wall-clock time** have elapsed since it. Studionet's
-GenVM exposes no native clock, so the contract fetches the current time from independent public
-sources (timeapi.io, Cloudflare, worldtimeapi) under validator consensus and refuses escalation
-until the window has genuinely passed. This closes the gap a protocol-action counter left open:
+GenVM exposes no native clock, so the contract fetches the current time under validator consensus
+from two independent, **probe-verified** sources — Cloudflare's edge clock (`/cdn-cgi/trace`) and
+**Ethereum's own latest block timestamp** (via Blockscout), i.e. a clock produced by a decentralised
+consensus rather than any single vendor's server — and refuses escalation until the window has
+genuinely passed. This closes the gap a protocol-action counter left open:
 the disputant produces protocol actions at will — even unrelated filler deals advance a global
 counter — so only *real elapsed time*, which no party can manufacture with any number of wallets,
-is a window that cannot be shortcut. The clock **fails closed**: if no time source is reachable,
-escalation is refused, never granted. And because execution is serialized, a `respond` that lands
-before escalation resolves the dispute on its merits, so a genuine answer always wins if it shows up.
+is a window that cannot be shortcut. The clock **fails closed**: if no time source is reachable, or
+if the two sources disagree by more than 300s (one is lying or stale), escalation is refused, never
+granted. And because execution is serialized, a `respond` that lands before escalation resolves the
+dispute on its merits, so a genuine answer always wins if it shows up.
+
+> **Why those two sources, specifically.** The first version of this clock used `timeapi.io` and
+> `worldtimeapi.org`. Probing `_utc_now()` from Studionet validators (2026-07-17) proved
+> `worldtimeapi.org` never loads at all, and **`timeapi.io` serves a clock ~6 minutes behind real
+> UTC** — its 381s disagreement with Cloudflare tripped the divergence guard on *every* call, so the
+> clock always read 0 and, because it fails closed, **`escalate()` always reverted**: the response
+> window could never open. The fail-closed logic was correct; the sources were not. Both current
+> sources are probe-verified on-chain, and the direct tests now include a source that *lies* — the
+> old tests served every source from one shared clock, which is precisely why they stayed green
+> while production was inert.
 
 **Verified on-chain.** Both were exercised end-to-end through MetaMask on the deployed contract:
 
@@ -105,12 +118,12 @@ frontend (Next.js 16, Vercel) ──── genlayer-js ──── GenLayer Stu
 
 ## Contract
 
-- **Address:** `0xD29b1a8b2ED86fd82269F977AE9825E2fB016377`
+- **Address:** `0x097c434abF6f1dC87AC8658a46d25c307916AAE8`
 
 > **Payout fix (July 2026).** Wallet payouts are sent as EVM external messages (an empty `@gl.evm.contract_interface` proxy executed by the contract's ghost account). The previous GenVM-call pattern errored at finalization on plain wallets and stranded the value; the contract was redeployed at the address above with the corrected transfer path.
 
 - **Network:** GenLayer Studionet
-- **View in Studio:** [GenLayer Studio](https://studio.genlayer.com/?import-contract=0xD29b1a8b2ED86fd82269F977AE9825E2fB016377)
+- **View in Studio:** [GenLayer Studio](https://studio.genlayer.com/?import-contract=0x097c434abF6f1dC87AC8658a46d25c307916AAE8)
 
 Studionet's GenVM exposes no native clock, so most lifecycle gates are action-based:
 unaccepted proposals are cancellable, and deadlines live in the sealed terms (the arbiter

@@ -1,4 +1,4 @@
-# v0.3.0
+# v0.4.0
 # { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 import json
@@ -35,13 +35,21 @@ NO_ANSWER       = "(the accused party gave no answer)"
 # that lands first auto-arbitrates and beats escalation). Fetch failure fails
 # CLOSED: with no trusted clock, escalation is refused — never the respondent.
 RESPONSE_WINDOW_SECONDS = 600   # 10 real minutes (a constant; production would use days)
-# Independent, keyless UTC clocks. One reachable source suffices; the contract
-# fails closed only if every one is unreachable, so no single outage blocks a
-# dispute. Ordered by observed reliability.
+# Independent, keyless UTC clocks, each PROBE-VERIFIED from Studionet validators
+# (2026-07-17) and agreeing with true UTC to within ~30s. One reachable source
+# suffices; the contract fails closed only if every one is unreachable, so no
+# single outage blocks a dispute.
+#
+# ⚠️ Two earlier sources were REMOVED after on-chain probing proved them unusable:
+#   • worldtimeapi.org  — never loads from validators (WEBPAGE_LOAD_FAILED)
+#   • timeapi.io        — serves a clock ~6 MINUTES BEHIND real UTC
+# Their 381s disagreement tripped the divergence guard in _utc_now() on EVERY
+# call, so the clock always read 0 and escalate() always reverted — the response
+# window this contract exists to enforce could never open. The guard was right;
+# the sources were wrong. Never add a clock source without probing it on-chain.
 TIME_SOURCES = (
-    ("https://timeapi.io/api/time/current/zone?timeZone=UTC", "civil"),
-    ("https://www.cloudflare.com/cdn-cgi/trace",              "cf_trace"),
-    ("https://worldtimeapi.org/api/timezone/Etc/UTC",         "unixtime"),
+    ("https://cloudflare.com/cdn-cgi/trace",               "cf_trace"),
+    ("https://eth.blockscout.com/api/v2/main-page/blocks", "eth_block"),
 )
 # Any epoch below this (~2023-11) is treated as an unreliable/failed clock read.
 MIN_SANE_EPOCH = 1_700_000_000
@@ -57,6 +65,17 @@ def _epoch_from_civil(y: int, m: int, d: int, hh: int, mm: int, ss: int) -> int:
     doe = yoe * 365 + yoe // 4 - yoe // 100 + doy
     days = era * 146097 + doe - 719468
     return days * 86400 + hh * 3600 + mm * 60 + ss
+
+
+def _epoch_from_iso(s: str) -> int:
+    """"2026-07-17T07:35:11.000000Z" -> epoch. UTC only; the Z suffix is assumed.
+    Used for Ethereum's block timestamp — a clock produced by a decentralised
+    consensus rather than any single vendor's server."""
+    s = str(s).strip()
+    date_part, _, rest = s.partition("T")
+    y, m, d = [int(x) for x in date_part.split("-")]
+    hh, mm, ss = [int(x) for x in rest.split(".")[0].replace("Z", "").split(":")[:3]]
+    return _epoch_from_civil(y, m, d, hh, mm, ss)
 
 EVIDENCE_GUARDRAILS = (
     "GUARDRAILS:\n"
@@ -155,18 +174,23 @@ class Sigil(gl.Contract):
                             if line.startswith("ts="):
                                 e = int(float(line[3:]))
                                 break
-                    elif kind == "unixtime":
-                        e = int(json.loads(raw)["unixtime"])
-                    else:  # civil
+                    elif kind == "eth_block":
+                        # Ethereum's latest block timestamp, via Blockscout's
+                        # keyless JSON — the freshest block is ~13s old (12s
+                        # block time), well inside the tolerance below.
                         d = json.loads(raw)
-                        e = _epoch_from_civil(int(d["year"]), int(d["month"]), int(d["day"]),
-                                              int(d["hour"]), int(d["minute"]), int(d["seconds"]))
+                        items = d if isinstance(d, list) else d.get("items", [])
+                        e = _epoch_from_iso(items[0]["timestamp"]) if items else 0
+                    else:
+                        e = 0
                     if e > MIN_SANE_EPOCH:
                         cands.append(e)
                 except Exception:
                     pass
             if len(cands) >= 2 and (max(cands) - min(cands)) > 300:
                 return "0"                      # sources diverge → distrust the clock
+            # Earliest corroborated reading: a conservative "now" can only ever
+            # delay escalation, i.e. favour the respondent — never the disputant.
             return str(min(cands)) if cands else "0"
 
         principle = (

@@ -72,20 +72,30 @@ _WEB_CALLS = []
 _NOW = [1_760_000_000]
 
 
+# Per-source clock SKEW in seconds, keyed by a substring of the source URL.
+# Default 0 (every source honest). A test can bias one source to model the real
+# world: timeapi.io was ~381s behind UTC, which is exactly what broke this
+# contract in production while the tests — which served every source from one
+# shared clock — stayed green.
+_SKEW = {}
+
+
 class _NondetWeb:
     @staticmethod
     def render(url, mode="text"):
         _WEB_CALLS.append(url)
+        skew = next((v for k, v in _SKEW.items() if k in url), 0)
+        now = _NOW[0] + skew
         # Serve the contract's pinned time sources from the test clock.
-        if "timeapi.io" in url:
-            import datetime as _dt
-            t = _dt.datetime.fromtimestamp(_NOW[0], _dt.timezone.utc)
-            return json.dumps({"year": t.year, "month": t.month, "day": t.day,
-                               "hour": t.hour, "minute": t.minute, "seconds": t.second})
         if "cdn-cgi/trace" in url:
-            return f"fl=1x2\nh=cloudflare.com\nts={_NOW[0]}.000\nvisit_scheme=https\n"
-        if "worldtimeapi" in url:
-            return json.dumps({"unixtime": _NOW[0]})
+            return f"fl=1x2\nh=cloudflare.com\nts={now}.000\nvisit_scheme=https\n"
+        if "blockscout" in url and "main-page/blocks" in url:
+            import datetime as _dt
+            t = _dt.datetime.fromtimestamp(now, _dt.timezone.utc)
+            return json.dumps([{
+                "height": 25550946,
+                "timestamp": t.strftime("%Y-%m-%dT%H:%M:%S.000000Z"),
+            }])
         if "unreachable" in url:
             raise RuntimeError("403")
         return f"[fetched proof from {url}]"
@@ -158,6 +168,7 @@ def c(module):
     _GL._emit = []
     _WEB_CALLS.clear()
     _NOW[0] = 1_760_000_000            # reset the test wall-clock each test
+    _SKEW.clear()                      # …and assume every clock source is honest
     _EqPrinciple.canned = '{"split_to_disputant": 75, "rationale": "stub"}'
     _as(module, P, 0)
     s = module.Sigil()
@@ -299,3 +310,78 @@ def test_escalate_still_requires_a_nudge(module, c):
     _as(module, P, 0)
     with pytest.raises(module.gl.vm.UserError, match="nudge first"):
         c.escalate(did)
+
+
+# ── Clock sources: the bug that made this contract's window inert ─────────────
+#
+# Shipped with timeapi.io + cloudflare + worldtimeapi and a 300s divergence
+# guard. On-chain probing (2026-07-17) proved worldtimeapi never loads from
+# validators and timeapi.io serves a clock ~381s BEHIND real UTC — so the guard
+# tripped on every call, _utc_now() always read 0, and escalate() ALWAYS
+# reverted. The response window this contract exists to enforce could never
+# open. The old tests missed it because the stub served every source from one
+# shared clock, i.e. it modelled a world where no clock ever lies.
+
+def test_clock_sources_are_only_the_on_chain_proven_ones(module):
+    assert module.TIME_SOURCES == (
+        ("https://cloudflare.com/cdn-cgi/trace", "cf_trace"),
+        ("https://eth.blockscout.com/api/v2/main-page/blocks", "eth_block"),
+    )
+    urls = " ".join(u for u, _ in module.TIME_SOURCES)
+    assert "timeapi.io" not in urls        # serves time ~6 minutes behind UTC
+    assert "worldtimeapi" not in urls      # WEBPAGE_LOAD_FAILED from validators
+
+
+def test_epoch_from_iso_matches_civil(module):
+    assert module._epoch_from_iso("2026-07-17T07:35:11.000000Z") == \
+        module._epoch_from_civil(2026, 7, 17, 7, 35, 11)
+
+
+def test_both_clock_sources_are_actually_read_and_agree(module, c):
+    """Regression: prove the window really opens on honest clocks — the exact
+    thing that silently stopped working in production."""
+    did = _active_deal(module, c)
+    _as(module, P, 0)
+    c.dispute(did, TERMS, SALT, "claim", "[]")
+    _as(module, P, 0)
+    _WEB_CALLS.clear()
+    c.nudge(did)
+    assert any("cdn-cgi/trace" in u for u in _WEB_CALLS)
+    assert any("blockscout" in u for u in _WEB_CALLS)
+    _NOW[0] += module.RESPONSE_WINDOW_SECONDS + 1
+    _as(module, P, 0)
+    out = json.loads(c.escalate(did))      # the window opens on real elapsed time
+    assert out["state"] == "RESOLVED"
+    assert out["ruling"]["kind"] == "escalation"
+
+
+def test_a_lying_clock_source_fails_closed_not_open(module, c):
+    """If one source drifts beyond tolerance (timeapi.io's real 381s bias), the
+    reading is discarded and escalation is REFUSED — never granted on bad time."""
+    did = _active_deal(module, c)
+    _as(module, P, 0)
+    c.dispute(did, TERMS, SALT, "claim", "[]")
+    _SKEW["blockscout"] = -381             # one source lies by >300s
+    _as(module, P, 0)
+    with pytest.raises(module.gl.vm.UserError, match="unreachable or unreliable"):
+        c.nudge(did)
+
+
+def test_one_dead_source_still_leaves_a_working_clock(module, c):
+    """A single outage must not block a dispute — one honest source suffices."""
+    did = _active_deal(module, c)
+    _as(module, P, 0)
+    c.dispute(did, TERMS, SALT, "claim", "[]")
+    real = module.TIME_SOURCES
+    try:
+        # blockscout goes dark; Cloudflare alone must still open the window
+        module.TIME_SOURCES = (real[0], ("https://unreachable.example/x", "eth_block"))
+        _as(module, P, 0)
+        c.nudge(did)
+        _NOW[0] += module.RESPONSE_WINDOW_SECONDS + 1
+        _as(module, P, 0)
+        out = json.loads(c.escalate(did))
+        assert out["state"] == "RESOLVED"
+        assert out["ruling"]["kind"] == "escalation"
+    finally:
+        module.TIME_SOURCES = real
